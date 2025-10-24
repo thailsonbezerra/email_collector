@@ -1,64 +1,48 @@
 import imaplib
 import email
 from email.header import decode_header
-import os
-from datetime import datetime
 
 # Configurações
 IMAP_SERVER = ""
 EMAIL_ADDRESS = ""
 PASSWORD = ""
-OUTPUT_DIR = "output"
-
-# Criar diretório de saída se não existir
-if not os.path.exists(OUTPUT_DIR):
-    os.makedirs(OUTPUT_DIR)
-
 
 def decode_subject(subject):
     # Decodifica o assunto do e-mail
-    decoded = decode_header(subject)
-    first_part = decoded[0]
-    subject_part = first_part[0]
-    encoding = first_part[1]
-
+    decoded = decode_header(subject)[0]
+    subject_part, encoding = decoded
     if isinstance(subject_part, bytes):
-        if encoding is not None:
-            subject_part = subject_part.decode(encoding)
-        else:
-            subject_part = subject_part.decode("utf-8")
+        return subject_part.decode(encoding or "utf-8")
     return subject_part
 
-
-def save_attachment(part, email_id):
-    # Salva anexos no disco
-    filename = part.get_filename()
-    if filename is not None:
-        decoded_filename_tuple = decode_header(filename)[0]
-        decoded_filename = decoded_filename_tuple[0]
-        if isinstance(decoded_filename, bytes):
-            decoded_filename = decoded_filename.decode()
-
-        safe_filename = ""
-        for c in decoded_filename:
-            if c.isalnum() or c in ('.', '_', '-'):
-                safe_filename += c
-
-        filepath = os.path.join(OUTPUT_DIR, str(email_id) + "_" + safe_filename)
-
-        with open(filepath, "wb") as f:
-            f.write(part.get_payload(decode=True))
-
-        print("Anexo salvo:", filepath)
-
+def get_email_content(msg):
+    # Extrai o conteúdo de texto do e-mail
+    if msg.is_multipart():
+        for part in msg.walk():
+            if part.get_content_type() == "text/plain":
+                payload = part.get_payload(decode=True)
+                try:
+                    return payload.decode("utf-8")
+                except UnicodeDecodeError:
+                    return payload.decode("latin-1", errors="replace")
+    else:
+        if msg.get_content_type() == "text/plain":
+            payload = msg.get_payload(decode=True)
+            try:
+                return payload.decode("utf-8")
+            except UnicodeDecodeError:
+                return payload.decode("latin-1", errors="replace")
+    return "Nenhum conteúdo de texto encontrado."
 
 def process_email():
     try:
+        # Conectar ao servidor IMAP e fazer login
         mail = imaplib.IMAP4_SSL(IMAP_SERVER)
         mail.login(EMAIL_ADDRESS, PASSWORD)
         mail.select("INBOX")
 
-        status, messages = mail.search(None, "ALL")
+        # Buscar e-mails não lidos
+        status, messages = mail.search(None, "UNSEEN")
         if status != "OK":
             print("Erro ao buscar e-mails.")
             return
@@ -68,7 +52,7 @@ def process_email():
         for mail_id in message_ids:
             status, msg_data = mail.fetch(mail_id, "(RFC822)")
             if status != "OK":
-                print("Erro ao buscar e-mail ID", mail_id)
+                print(f"Erro ao buscar e-mail ID {mail_id.decode()}")
                 continue
 
             raw_email = msg_data[0][1]
@@ -76,51 +60,20 @@ def process_email():
 
             subject = decode_subject(msg["subject"])
             from_ = msg.get("from")
+            content = get_email_content(msg)
 
-            print("")
-            print("E-mail ID:", mail_id.decode())
+            print("\nE-mail ID:", mail_id.decode())
             print("Assunto:", subject)
-            print("De:", from_)
-
-            html_content = None
-
-            if msg.is_multipart():
-                for part in msg.walk():
-                    content_type = part.get_content_type()
-                    disposition = part.get("Content-Disposition")
-
-                    if content_type == "text/html":
-                        payload = part.get_payload(decode=True)
-                        try:
-                            html_content = payload.decode()
-                        except UnicodeDecodeError:
-                            html_content = payload.decode("latin-1", errors="replace")
-
-                    elif disposition is not None and part.get_filename() is not None:
-                        save_attachment(part, mail_id.decode())
-
-            else:
-                content_type = msg.get_content_type()
-                if content_type == "text/html":
-                    payload = msg.get_payload(decode=True)
-                    try:
-                        html_content = payload.decode()
-                    except UnicodeDecodeError:
-                        html_content = payload.decode("latin-1", errors="replace")
-
-            if html_content is not None:
-                html_filename = os.path.join(OUTPUT_DIR, "email_" + mail_id.decode() + ".html")
-                with open(html_filename, "w", encoding="utf-8") as f:
-                    f.write(html_content)
-                print("HTML salvo:", html_filename)
-
+            print("Remetente:", from_)
+            print("Conteúdo:", content)
+            print("-" * 50)
+            
         mail.logout()
 
     except imaplib.IMAP4.error as e:
         print("Erro ao conectar ou autenticar:", e)
     except Exception as e:
         print("Erro inesperado:", e)
-
 
 if __name__ == "__main__":
     process_email()
