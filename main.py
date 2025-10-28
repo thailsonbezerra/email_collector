@@ -2,11 +2,14 @@ import imaplib
 import email
 from email.header import decode_header
 from email.utils import parseaddr, parsedate_to_datetime
+from dotenv import load_dotenv
+import os
 
-IMAP_SERVER = ""
-EMAIL_ADDRESS = ""
-PASSWORD = ""
+load_dotenv()
 
+IMAP_SERVER = os.getenv("IMAP_SERVER_COLLECTOR")
+EMAIL_ADDRESS = os.getenv("EMAIL_ADDRESS_COLLECTOR")
+PASSWORD = os.getenv("PASSWORD_COLLECTOR")
 
 def parse_address(address_header):
     """Extrai nome e email do header From"""
