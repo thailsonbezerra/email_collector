@@ -1,5 +1,6 @@
 import imaplib
 import email
+import requests
 from email.header import decode_header
 from email.utils import parseaddr, parsedate_to_datetime
 from dotenv import load_dotenv
@@ -10,6 +11,7 @@ load_dotenv()
 IMAP_SERVER = os.getenv("IMAP_SERVER_COLLECTOR")
 EMAIL_ADDRESS = os.getenv("EMAIL_ADDRESS_COLLECTOR")
 PASSWORD = os.getenv("PASSWORD_COLLECTOR")
+API_WEBHOOK_URL = f"http://localhost:80/api/webhook/tickets"
 
 def parse_address(address_header):
     """Extrai nome e email do header From"""
@@ -125,6 +127,7 @@ def process_email():
 
         message_ids = messages[0].split()
 
+        count = 3
         for mail_id in message_ids:
             status, msg_data = mail.fetch(mail_id, "(RFC822)")
             if status != "OK":
@@ -134,9 +137,19 @@ def process_email():
             raw_email = msg_data[0][1]
             msg = email.message_from_bytes(raw_email)
 
-            email_info = parse_email(msg)
-            print(email_info)
+            result = parse_email(msg)
             
+            result['ticket_id'] = str(count)
+
+            response = requests.post(API_WEBHOOK_URL, json=result)
+
+            # Verifica se a chamada para o API foi bem-sucedida
+            if response.status_code == 200:
+                print(f"Dados enviados com sucesso para o API. Resposta: {response.json()}")
+            else:
+                print(f"Falha ao enviar dados para o API. Status: {response.status_code}, Resposta: {response.text}")
+            count += 1
+
         mail.logout()
 
     except imaplib.IMAP4.error as e:

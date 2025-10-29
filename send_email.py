@@ -5,11 +5,12 @@ import os
 
 load_dotenv()
 
-IMAP_SERVER = os.getenv("IMAP_SERVER_COLLECTOR")
-EMAIL_ADDRESS = os.getenv("EMAIL_ADDRESS_COLLECTOR")
-PASSWORD = os.getenv("PASSWORD_COLLECTOR")
+SMTP_SERVER = os.getenv("SMTP_SERVER_SENDER")
+EMAIL_ADDRESS = os.getenv("EMAIL_ADDRESS_SENDER")
+PASSWORD = os.getenv("PASSWORD_SENDER")
 
 msg = EmailMessage()
+msg['From'] = 'Thailson Bezerra'
 msg['To'] = 'thailson.bezerra.119@ufrn.edu.br'
 msg['Subject'] = 'Teste com metadados'
 
@@ -20,7 +21,7 @@ msg.add_header('X-Ticket-ID', '2')
 msg.set_content('Teste com metadados no email.')
 
 # Envio
-with smtplib.SMTP(IMAP_SERVER, 587) as server:
+with smtplib.SMTP(SMTP_SERVER, 587) as server:
     server.starttls()
     server.login(EMAIL_ADDRESS, PASSWORD)
     server.send_message(msg)
