@@ -139,6 +139,7 @@ def process_email():
 
             result = parse_email(msg)
             
+            #apenas por enquanto para testar integração com core
             result['ticket_id'] = str(count)
 
             response = requests.post(API_WEBHOOK_URL, json=result)
